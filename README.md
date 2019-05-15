@@ -96,9 +96,9 @@ writer.close()
 ### Read blob as a stream and pipe it (see: [Screw FileReader](https://www.npmjs.com/package/screw-filereader))
 
 ```javascript
-require('screw-filereader')
-const fileStream = streamSaver.createWriteStream('filename.txt')
+require('screw-filereader') // optional in chrome v76, streams exist native on blobs now!
 const blob = new Blob([ 'a'.repeat(1E9*5) ]) // 1*5 MB
+const fileStream = streamSaver.createWriteStream('filename.txt', blob.size)
 
 blob.stream().pipeTo(fileStream)
 ```
@@ -108,7 +108,6 @@ blob.stream().pipeTo(fileStream)
 
 ```javascript
 get_user_media_stream_somehow().then(mediaStream => {
-	let fr = new FileReader
 	let mediaRecorder = new MediaRecorder(mediaStream)
 	let chunks = Promise.resolve()
 	let fileStream = streamSaver.createWriteStream('filename.mp4')
@@ -125,14 +124,10 @@ get_user_media_stream_somehow().then(mediaStream => {
 		, 1000)
 	}
 
-	mediaRecorder.ondataavailable = ({blob}) => {
-		chunks = chunks.then(() => new Promise(resolve => {
-			fr.onload = () => {
-				writer.write(new Uint8Array(fr.result))
-				resolve()
-			}
-			fr.readAsArrayBuffer(blob)
-		}))
+	mediaRecorder.ondataavailable = ({ blob }) => {
+		chunks = chunks.then(() => blob.arrayBuffer().then(buf => 
+			writer.write(new Uint8Array(buf))
+		))
 	}
 
 })
@@ -142,29 +137,26 @@ get_user_media_stream_somehow().then(mediaStream => {
 
 ```javascript
 fetch(url).then(res => {
-	const fileStream = streamSaver.createWriteStream('filename.txt')
-	const writer = fileStream.getWriter()
+  const fileStream = streamSaver.createWriteStream('filename.txt')
 
   // more optimized
   if (res.body.pipeTo) {
-    // like as we never did fileStream.getWriter()
-    writer.releaseLock()
     return res.body.pipeTo(fileStream)
   }
+  
+  const writer = fileStream.getWriter()
+  const reader = res.body.getReader()
+  const pump = () => reader.read().then(({ value, done }) => done
+    // close the stream so we stop writing
+    ? writer.close()
+    // Write one chunk, then get the next one
+    : writer.write(value).then(pump)
+  )
 
-	const reader = res.body.getReader()
-	const pump = () => reader.read()
-		.then(({ value, done }) => done
-			// close the stream so we stop writing
-			? writer.close()
-			// Write one chunk, then get the next one
-			: writer.write(value).then(pump)
-		)
-
-	// Start the reader
-	pump().then(() =>
-		console.log('Closed the stream, Done writing')
-	)
+  // Start the reader
+  pump().then(() =>
+    console.log('Closed the stream, Done writing')
+  )
 })
 ```
 
@@ -231,12 +223,6 @@ python -m SimpleHTTPServer 3001
 # then open localhost:3001/example.html
 ```
 
-Consensus
-=========
-Go ahead and vote for how important this feature is
-
-- [serviceWorker][17] MS Edge status: In Development
-- [streams][18] Firefox Status: ASSIGNED
 
 [1]: https://github.com/eligrey
 [2]: https://github.com/eligrey/FileSaver.js
@@ -254,8 +240,6 @@ Go ahead and vote for how important this feature is
 [14]: https://streams.spec.whatwg.org/#rs-class
 [15]: https://www.npmjs.com/package/@mattiasbuelens/web-streams-polyfill
 [16]: https://developer.microsoft.com/en-us/microsoft-edge/platform/status/fetchapi
-[17]: https://developer.microsoft.com/en-us/microsoft-edge/platform/status/serviceworker
-[18]: https://bugzilla.mozilla.org/show_bug.cgi?id=1128959
 [19]: https://webtorrent.io
 [npm-image]: https://img.shields.io/npm/v/streamsaver.svg?style=flat-square
 [npm-url]: https://www.npmjs.com/package/streamsaver

@@ -1,5 +1,13 @@
 /* global self ReadableStream Response */
 
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim())
+})
+
 const map = new Map()
 
 // This should be called once per download
@@ -14,14 +22,25 @@ self.onmessage = event => {
   // Create a uniq link for the download
   const uniqLink = self.registration.scope + 'intercept-me-nr' + Math.random()
   const port = event.ports[0]
+  const metadata = new Array(3) // [stream, data, port]
 
-  const stream = event.data.readableStream || createStream(port)
-  map.set(uniqLink, [stream, event.data])
+  metadata[1] = event.data
+
+  if (event.data.transferringReadable) {
+    port.onmessage = evt => {
+      port.onmessage = null
+      metadata[0] = evt.data.readableStream
+    }
+  } else {
+    // Note to self:
+    // old streamsaver version might still use this...
+    // but v1.2.0+ will always transfer the stream throught MessageChannel #94
+    metadata[0] = event.data.readableStream || createStream(port)
+    metadata[2] = port
+  }
+
+  map.set(uniqLink, metadata)
   port.postMessage({ download: uniqLink, ping: self.registration.scope + 'ping' })
-
-  // Mistage adding this and have streamsaver.js rely on it
-  // depricated as from 0.2.1
-  port.postMessage({ debug: 'Mocking a download request' })
 }
 
 function createStream (port) {
@@ -61,7 +80,7 @@ self.onfetch = event => {
 
   if (!hijacke) return null
 
-  const [stream, data] = hijacke
+  const [ stream, data, port ] = hijacke
 
   map.delete(url)
 
@@ -78,4 +97,6 @@ self.onfetch = event => {
   if (data.size) headers['Content-Length'] = data.size
 
   event.respondWith(new Response(stream, { headers }))
+
+  port && port.postMessage({ debug: 'Download started' })
 }
