@@ -20,8 +20,8 @@
     WritableStream: window.WritableStream || ponyfill.WritableStream,
     supported: false,
     version: { full: '1.2.0', major: 1, minor: 2, dot: 0 },
-    mitm: 'https://jimmywarting.github.io/StreamSaver.js/mitm.html?version=1.2.0',
-    ping: 'https://jimmywarting.github.io/StreamSaver.js/ping.html?version=1.2.0'
+    mitm: 'https://vadimzhiltsov.github.io/StreamSaver.js/mitm.html?version=1.2.0',
+    ping: 'https://vadimzhiltsov.github.io/StreamSaver.js/ping.html?version=1.2.0'
   }
 
   function makeIframe (src) {
