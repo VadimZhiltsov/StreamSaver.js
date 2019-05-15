@@ -24,6 +24,7 @@ let keepAlive = sw => {
   if (window.location.hash) {
     let channel = new MessageChannel
     channel.port1.onmessage = evt => {
+		console.log('Message to SW', evt)
       sw.postMessage(evt.data, evt.ports)
     }
     new SharedWorker('ping.js').port.postMessage({
@@ -43,7 +44,10 @@ let keepAlive = sw => {
 // but since we need to wait for the Service Worker registration, we store the
 // message for later
 let messages = []
-window.onmessage = evt => messages.push(evt)
+window.onmessage = evt => {
+	console.log('message from TOP ', evt)
+	messages.push(evt)
+}
 
 // Register the worker, then forward the dataChannel to the worker
 // So they can talk directly, so we don't have to be "the middle man" any
