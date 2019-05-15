@@ -8,7 +8,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim())
 })
 
-const map = new Map()
+const map = {}
 
 // This should be called once per download
 // Each event has a dataChannel that the data will be piped through
@@ -39,7 +39,7 @@ self.onmessage = event => {
     metadata[2] = port
   }
 
-  map.set(uniqLink, metadata)
+  map[uniqLink] = metadata;
   port.postMessage({ download: uniqLink, ping: self.registration.scope + 'ping' })
 }
 
@@ -76,13 +76,13 @@ self.onfetch = event => {
     }))
   }
 
-  const hijacke = map.get(url)
+  const hijacke = map[url]
 
   if (!hijacke) return null
 
   const [ stream, data, port ] = hijacke
 
-  map.delete(url)
+  delete map[url];
 
   // Make filename RFC5987 compatible
   const filename = encodeURIComponent(typeof data === 'string' ? data : data.filename)
